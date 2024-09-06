@@ -1,0 +1,3 @@
+[submodule "ext/libcpp-common"]
+	path = ext/libcpp-common
+	url = git@github.com:diegoroyo/libcpp-common.git

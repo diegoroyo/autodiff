@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "libcpp-common/geometry.h"
+
 namespace ad {
 
 #define AD_ENSURE_REQUIRES_GRAD(x)                                       \
@@ -139,6 +141,8 @@ class Value {
     friend Value &relu(Value &obj);
 };
 
+/// Math functions ///
+
 Value &pow(Value &base, Value &exponent) {
     static auto backward_f = [](Value *v) {
         AD_ENSURE_REQUIRES_GRAD(v);
@@ -167,6 +171,8 @@ Value &pow(Value &base, Value &exponent) {
 AD_BINARY_PERFECT_FORWARD(EMPTY, pow);
 #undef EMPTY
 
+/// NN related functions ///
+
 Value &relu(Value &obj) {
     static auto backward_f = [](Value *v) {
         AD_ENSURE_REQUIRES_GRAD(v);
@@ -185,13 +191,6 @@ Value &relu(Value &obj) {
 }
 Value &relu(Value &&v) { return relu(v); }
 
+/// Tensor-like structures ///
+
 };  // namespace ad
-
-int main() {
-    ad::Value x(-3);
-
-    auto y = ad::relu(-x * 3 + 2);
-    y.backward();
-
-    std::cout << x.grad() << std::endl;
-}
