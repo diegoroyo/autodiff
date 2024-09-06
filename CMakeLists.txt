@@ -13,7 +13,12 @@ include_directories(${CMAKE_SOURCE_DIR}/ext/libcpp-common/src)
 
 add_subdirectory(ext/libcpp-common/)
 
-# Main program
+# Examples
+
 # file(GLOB_RECURSE libautodiff-SRC "src/*.cpp")
+
 add_executable(karpathy "examples/karpathy.cpp")
 target_link_libraries(karpathy PRIVATE libcpp-common)
+
+add_executable(matrixvector "examples/matrixvector.cpp")
+target_link_libraries(matrixvector PRIVATE libcpp-common)
