@@ -22,3 +22,6 @@ target_link_libraries(karpathy PRIVATE libcpp-common)
 
 add_executable(matrixvector "examples/matrixvector.cpp")
 target_link_libraries(matrixvector PRIVATE libcpp-common)
+
+add_executable(andgate "examples/andgate.cpp")
+target_link_libraries(andgate PRIVATE libcpp-common)
