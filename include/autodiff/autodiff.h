@@ -52,6 +52,39 @@ auto sum_if_scalar(const R& v) {
     }
 }
 
+template <typename T1, typename T2,
+          typename = std::enable_if_t<std::is_scalar_v<T2>>>
+T1 pow(const T1& base, const T2& exponent) {
+    if constexpr (is_vec_v<T1> || is_mat_v<T1>) {
+        return base.pow(exponent);
+    } else {
+        return std::pow(base, exponent);
+    }
+}
+
+template <typename T>
+T ewise_mult(const T& lhs, const T& rhs) {
+    if constexpr (is_vec_v<T> || is_mat_v<T>) {
+        return lhs.ewise_mult(rhs);
+    } else {
+        return lhs * rhs;
+    }
+}
+
+template <typename T>
+T relu_helper(const T& cond, const T& v) {
+    if constexpr (is_vec_v<T>) {
+        return v.map(
+            [&cond](auto& e, size_t i) { return cond[i] > 0 ? e : 0; });
+    } else if constexpr (is_mat_v<T>) {
+        return v.map([&cond](auto& e, size_t i, size_t j) {
+            return cond(i, j) > 0 ? e : 0;
+        });
+    } else {
+        return v > 0 ? v : 0;
+    }
+}
+
 template <typename TR, typename TP, typename TB>
 static TR compute_grad_mult(const TP& parent_grad, const TB& brother_value) {
     TR result;
@@ -114,7 +147,7 @@ class _Value {
             &_Value<T>::default_to_string,
         std::string op_name = "Value", std::vector<void*> const& children = {})
         : m_value(value),
-          m_grad(0.0f),
+          m_grad(1.0f),
           m_has_grad(false),
           m_requires_grad(true),
           m_backward_f(backward_f),
@@ -125,19 +158,15 @@ class _Value {
     // TODO handle parent node in destructor (destroy it)
     // ~_Value() { std::cerr << "Destructor called" << std::endl; }
 
-    static _Value* TempValue(T value) {
-        _Value* result = new _Value(value);
+    static _Value<T>* TempValue(T value) {
+        _Value<T>* result = new _Value<T>(value);
         result->m_requires_grad = false;
         return result;
     }
 
-    void _backward_impl() {
+    void backward() {
         m_has_grad = true;
         m_backward_f(this);
-    }
-    void backward() {
-        m_grad = m_value;
-        _backward_impl();
     }
     T value() const { return m_value; }
     T grad() const {
@@ -165,34 +194,34 @@ class _Value {
 // _Value. In those cases we make a TempValue as seen above. That's the rest
 // of the methods of this list.
 // the is_same_template are there to prevent _Value<_Value<T>> recursiveness
-#define AD_BINARY_PERFECT_FORWARD(op, cls, func)        \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(cls<T>& lhs, cls<T2>&& rhs) {  \
-        return func(lhs, rhs);                          \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(cls<T>&& lhs, cls<T2>& rhs) {  \
-        return func(lhs, rhs);                          \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(cls<T>&& lhs, cls<T2>&& rhs) { \
-        return func(lhs, rhs);                          \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(cls<T>& lhs, T2 rhs) {         \
-        return func(lhs, AD_MAKE_TEMP(rhs, T2));        \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(cls<T>&& lhs, T2 rhs) {        \
-        return func(lhs, AD_MAKE_TEMP(rhs, T2));        \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(T lhs, cls<T2>& rhs) {         \
-        return func(AD_MAKE_TEMP(lhs, T), rhs);         \
-    }                                                   \
-    AD_TEMPLATE_NON_CLS(op)                             \
-    friend cls<TR>& func(T lhs, cls<T2>&& rhs) {        \
-        return func(AD_MAKE_TEMP(lhs, T), rhs);         \
+#define AD_BINARY_PERFECT_FORWARD(op, func)                      \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(_Value<T>& lhs, _Value<T2>&& rhs) {  \
+        return func(lhs, rhs);                                   \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(_Value<T>&& lhs, _Value<T2>& rhs) {  \
+        return func(lhs, rhs);                                   \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(_Value<T>&& lhs, _Value<T2>&& rhs) { \
+        return func(lhs, rhs);                                   \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(_Value<T>& lhs, T2 rhs) {            \
+        return func(lhs, AD_MAKE_TEMP(rhs, T2));                 \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(_Value<T>&& lhs, T2 rhs) {           \
+        return func(lhs, AD_MAKE_TEMP(rhs, T2));                 \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(T lhs, _Value<T2>& rhs) {            \
+        return func(AD_MAKE_TEMP(lhs, T), rhs);                  \
+    }                                                            \
+    AD_TEMPLATE_NON_CLS(op)                                      \
+    friend _Value<TR>& func(T lhs, _Value<T2>&& rhs) {           \
+        return func(AD_MAKE_TEMP(lhs, T), rhs);                  \
     }
 
 #define AD_BINARY_OP(op, lhs_grad, rhs_grad)                                   \
@@ -205,11 +234,11 @@ class _Value {
             _Value<T2>* rhs = static_cast<_Value<T2>*>(v->m_children[1]);      \
             if (lhs->m_requires_grad) {                                        \
                 lhs->m_grad = lhs_grad;                                        \
-                lhs->_backward_impl();                                         \
+                lhs->backward();                                               \
             }                                                                  \
             if (rhs->m_requires_grad) {                                        \
                 rhs->m_grad = rhs_grad;                                        \
-                rhs->_backward_impl();                                         \
+                rhs->backward();                                               \
             }                                                                  \
         };                                                                     \
         static auto to_string = [](std::ostream& o,                            \
@@ -224,7 +253,7 @@ class _Value {
                            #op, {&lhs, &rhs});                                 \
         return *result;                                                        \
     }                                                                          \
-    AD_BINARY_PERFECT_FORWARD(op, _Value, operator op)
+    AD_BINARY_PERFECT_FORWARD(op, operator op)
 
     AD_BINARY_OP(+, detail::sum_if_scalar<decltype(lhs->m_value)>(v->m_grad),
                  detail::sum_if_scalar<decltype(rhs->m_value)>(v->m_grad));
@@ -232,82 +261,118 @@ class _Value {
 
                  detail::sum_if_scalar<decltype(rhs->m_value)>(v->m_grad) *
                      -1.0f);
-    // NOTE this is the old pre-tensor version
-    // AD_BINARY_OP(*, lhs.m_value *rhs.m_value, v->m_grad * rhs->m_value,
-    //              v->m_grad * lhs->m_value);
     AD_BINARY_OP(*, detail::compute_grad_mult<T>(v->m_grad, rhs->m_value),
                  detail::compute_grad_mult<T2>(v->m_grad, lhs->m_value));
-    // TODO create compute_grad_div or sth and enable division
-    // AD_BINARY_OP(/, lhs.m_value / rhs.m_value, v->m_grad / rhs->m_value,
-    //              v->m_grad * lhs->m_value / (rhs->m_value * rhs->m_value));
+    AD_BINARY_OP(/,
+                 detail::sum_if_scalar<decltype(lhs->m_value)>(v->m_grad /
+                                                               rhs->m_value),
+                 detail::sum_if_scalar<decltype(rhs->m_value)>(
+                     v->m_grad * lhs->m_value / (rhs->m_value * rhs->m_value)));
 
-    // #define AD_UNARY_OP(op, value, grad)                                      \
-//     template <typename T1>                                                \
-//     friend _Value<T>& operator op(_Value<T1>& obj) {                      \
-//         static auto backward_f = [](_Value<T>* v) {                       \
-//             AD_ENSURE_REQUIRES_GRAD(v);                                   \
-//             _Value<T1>* obj = static_cast<_Value<T1>*>(v->m_children[0]); \
-//             if (obj->m_requires_grad) {                                   \
-//                 obj->m_grad = grad;                                       \
-//                 obj->_backward_impl();                                          \
-//             }                                                             \
-//         };                                                                \
-//         static auto to_string = [](std::ostream& o,                       \
-//                                    const _Value<T>* v) -> std::ostream& { \
-//             _Value<T1>* obj = static_cast<_Value<T1>*>(v->m_children[0]); \
-//             o << #op << *obj;                                             \
-//             return o;                                                     \
-//         };                                                                \
-//         _Value<T>* result =                                               \
-//             new _Value<T>(value, backward_f, to_string, #op, {&obj});     \
-//         return *result;                                                   \
-//     }                                                                     \
-//     friend _Value<T>& operator op(_Value<T>&& obj) { return operator op(obj); }
+#define AD_UNARY_OP(op, value, grad)                                       \
+    template <typename TR = decltype(op std::declval<T>())>                \
+    friend _Value<TR>& operator op(_Value<T>& obj) {                       \
+        static auto backward_f = [](_Value<TR>* v) {                       \
+            AD_ENSURE_REQUIRES_GRAD(v);                                    \
+            _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);    \
+            if (obj->m_requires_grad) {                                    \
+                obj->m_grad = grad;                                        \
+                obj->backward();                                           \
+            }                                                              \
+        };                                                                 \
+        static auto to_string = [](std::ostream& o,                        \
+                                   const _Value<TR>* v) -> std::ostream& { \
+            _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);    \
+            o << #op << *obj;                                              \
+            return o;                                                      \
+        };                                                                 \
+        _Value<TR>* result =                                               \
+            new _Value<TR>(value, backward_f, to_string, #op, {&obj});     \
+        return *result;                                                    \
+    }                                                                      \
+    template <typename TR = decltype(op std::declval<T>())>                \
+    friend _Value<TR>& operator op(_Value<T>&& obj) {                      \
+        return operator op(obj);                                           \
+    }
 
-    //     AD_UNARY_OP(-, -obj.m_value, v->m_grad * -1);
+    AD_UNARY_OP(-, -obj.m_value, v->m_grad * -1);
 
-    //     template <typename T2>
-    //     friend _Value<T2>& pow(_Value<T2>& base, _Value<T2>& exponent);
-    template <typename T2>
-    friend _Value<T2>& relu(_Value<T2>& obj);
-    //     template <typename T2>
-    //     friend _Value<float>& sum(_Value<T2>& obj);
+    template <typename T1, typename T2, typename>
+    friend _Value<T1>& pow(_Value<T1>& base, _Value<T2>& exponent);
+    template <typename T1>
+    friend _Value<T1>& relu(_Value<T1>& obj);
+    template <typename T1>
+    friend _Value<float>& sum(_Value<T1>& obj);
 };
 
 using Value = _Value<float>;
 
 /// Math functions ///
 
-// template <typename T, typename T1, typename T2>
-// _Value<T> &pow(_Value<T1> &base, _Value<T2> &exponent) {
-//     static auto backward_f = [](_Value<T> *v) {
-//         AD_ENSURE_REQUIRES_GRAD(v);
-//         auto base = v->m_children[0], exponent = v->m_children[1];
-//         if (base->m_requires_grad) {
-//             // d/dx x^n = n*x^(n-1)
-//             base->m_grad = v->m_grad * exponent->m_value *
-//                            std::pow(base->m_value, exponent->m_value - 1.0f);
-//             base->_backward_impl();
-//         }
-//         if (exponent->m_requires_grad) {
-//             // d/dx n^x = n^x log(n)
-//             exponent->m_grad = v->m_grad * v->m_value *
-//             std::log(base->m_value); exponent->_backward_impl();
-//         }
-//     };
-//     static auto to_string = [](std::ostream &o,
-//                                const _Value<T> *v) -> std::ostream & {
-//         o << *v->m_children[0] << "**" << *v->m_children[1];
-//         return o;
-//     };
-//     _Value<T> *result =
-//         new _Value<T>(std::pow(base.m_value, exponent.m_value), backward_f,
-//                       to_string, "**", {&base, &exponent});
-//     return *result;
-// }
-// // TODO this will need another perfect forward macro probably
-// // separate from binary operations in the class
-// AD_BINARY_PERFECT_FORWARD(_Value, pow);
+#define AD_POW_TEMPLATE                                                   \
+    template <typename T1, typename T2,                                   \
+              typename = std::enable_if_t<!detail::is_value<T1>::value && \
+                                          std::is_scalar_v<T2>>>
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>& base, _Value<T2>& exponent) {
+    static auto backward_f = [](_Value<T1>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _Value<T1>* base = static_cast<_Value<T1>*>(v->m_children[0]);
+        _Value<T2>* exponent = static_cast<_Value<T2>*>(v->m_children[1]);
+        if (base->m_requires_grad) {
+            // d/dx x^n = n*x^(n-1)
+            base->m_grad = ad::detail::ewise_mult(
+                v->m_grad * exponent->m_value,
+                ad::detail::pow(base->m_value, exponent->m_value - 1.0f));
+            base->backward();
+        }
+        if (exponent->m_requires_grad) {
+            std::cerr
+                << "Error: gradient cannot be computed for the base in ad::pow"
+                << std::endl;
+            // NOTE this would just work if we implemented element-wise log for
+            // vector/matrix types. But it's too much work for sth that is not
+            // going to be used
+            // d/dx n^x = n^x log(n) exponent->m_grad =
+            // ad::detail::sum(ad::detail::ewise_mult(
+            //     v->m_grad, v->m_value * std::log(base->m_value)));
+            exponent->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _Value<T1>* v) -> std::ostream& {
+        _Value<T1>* base = static_cast<_Value<T1>*>(v->m_children[0]);
+        _Value<T2>* exponent = static_cast<_Value<T2>*>(v->m_children[1]);
+        o << *base << "**" << *exponent;
+        return o;
+    };
+    _Value<T1>* result =
+        new _Value<T1>(ad::detail::pow(base.m_value, exponent.m_value),
+                       backward_f, to_string, "**", {&base, &exponent});
+    return *result;
+}
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>& lhs, _Value<T2>&& rhs) { return pow(lhs, rhs); }
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>&& lhs, _Value<T2>& rhs) { return pow(lhs, rhs); }
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>&& lhs, _Value<T2>&& rhs) { return pow(lhs, rhs); }
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>& lhs, T2 rhs) {
+    return pow(lhs, AD_MAKE_TEMP(rhs, T2));
+}
+AD_POW_TEMPLATE
+_Value<T1>& pow(_Value<T1>&& lhs, T2 rhs) {
+    return pow(lhs, AD_MAKE_TEMP(rhs, T2));
+}
+AD_POW_TEMPLATE
+_Value<T1>& pow(T1 lhs, _Value<T2>& rhs) {
+    return pow(AD_MAKE_TEMP(lhs, T1), rhs);
+}
+AD_POW_TEMPLATE
+_Value<T1>& pow(T1 lhs, _Value<T2>&& rhs) {
+    return pow(AD_MAKE_TEMP(lhs, T1), rhs);
+}
 
 /// Element-wise operations ///
 
@@ -317,9 +382,8 @@ _Value<T>& relu(_Value<T>& obj) {
         AD_ENSURE_REQUIRES_GRAD(v);
         _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
         if (obj->m_requires_grad) {
-            // FIXME remove [0] and account for vec and mat values/grads
-            obj->m_grad = v->m_value[0] > 0 ? v->m_grad[0] : 0;
-            obj->_backward_impl();
+            obj->m_grad = ad::detail::relu_helper(v->m_value, v->m_grad);
+            obj->backward();
         }
     };
     static auto to_string = [](std::ostream& o,
@@ -328,9 +392,9 @@ _Value<T>& relu(_Value<T>& obj) {
         o << "relu(" << *obj << ")";
         return o;
     };
-    // FIXME remove [0] and account for vec and mat values/grads
-    _Value<T>* result = new _Value<T>(obj.m_value[0] > 0 ? obj.m_value[0] : 0,
-                                      backward_f, to_string, "relu", {&obj});
+    _Value<T>* result =
+        new _Value<T>(ad::detail::relu_helper(obj.m_value, obj.m_value),
+                      backward_f, to_string, "relu", {&obj});
     return *result;
 }
 template <typename T>
@@ -355,7 +419,7 @@ Value& sum(_Value<T>& obj) {
         _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
         if (obj->m_requires_grad) {
             obj->m_grad = v->m_grad;
-            obj->_backward_impl();
+            obj->backward();
         }
     };
     static auto to_string = [](std::ostream& o,
@@ -365,7 +429,7 @@ Value& sum(_Value<T>& obj) {
         return o;
     };
     Value* result = new Value(detail::sum(obj.m_value), backward_f, to_string,
-                              "relu", {&obj});
+                              "sum", {&obj});
     return *result;
 }
 template <typename T>
