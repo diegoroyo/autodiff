@@ -349,8 +349,6 @@ class _Value {
     friend _Value<T1>& sin(_Value<T1>& obj);
     template <typename T1>
     friend _Value<T1>& cos(_Value<T1>& obj);
-    template <typename T1>
-    friend _Value<T1>& cos(_Value<T1>& obj);
     template <unsigned int N>
     friend _Value<common::Vec<float, N>>& expand(_Value<float>& obj);
     template <unsigned int N, unsigned int S>

@@ -84,14 +84,15 @@ void save_image(NeRF& nerf, unsigned int width, unsigned int height,
         }
     }
 
-    common::save_bitmap("/home/diego/cpp/autodiff/examples/sunflower_nerf_est" +
-                            std::to_string(step) + ".ppm",
-                        y_est);
+    common::save_bitmap(
+        "/home/diego/cpp/autodiff/examples/gif/sunflower_nerf_est" +
+            std::to_string(step) + ".ppm",
+        y_est);
 }
 
 int main() {
     common::Bitmap3u image = common::load_bitmap<common::Color3u>(
-        "/home/diego/cpp/autodiff/examples/sunflower.ppm");
+        "/home/diego/cpp/autodiff/examples/images/sunflower.ppm");
     common::Bitmap3f y = image.map<common::Color3f>(
         [](const common::Color3u& in) { return in.cast_to<float>() / 255.0f; });
 
@@ -100,8 +101,8 @@ int main() {
     srand(0);
     NeRF nerf;
 
-    float lr = 0.1f;
-    size_t steps = 100001;
+    float lr = 0.15f;
+    size_t steps = 200001;
 
     for (size_t step = 0; step < steps; ++step) {
         std::cout << "." << std::flush;
@@ -116,7 +117,13 @@ int main() {
         loss.backward();
         nerf.update(lr);
 
-        if (step % 50000 == 0) {
+        if (step < 2500 && step % 250 == 0) {
+            save_image(nerf, width, height, step);
+        } else if (step < 10000 && step % 1000 == 0) {
+            save_image(nerf, width, height, step);
+        } else if (step < 50000 && step % 5000 == 0) {
+            save_image(nerf, width, height, step);
+        } else if (step % 10000 == 0) {
             save_image(nerf, width, height, step);
         }
     }
