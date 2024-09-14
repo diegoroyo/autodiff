@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cmath>
 #include <exception>
 #include <iostream>
@@ -85,6 +87,41 @@ T relu_helper(const T& cond, const T& v) {
     }
 }
 
+template <typename T>
+T sigmoid(const T& v) {
+    static auto sigmoid_impl = [](float x) { return 1 / (1 + std::exp(-x)); };
+    if constexpr (is_vec_v<T>) {
+        return v.map([](auto& e, size_t i) { return sigmoid_impl(e); });
+    } else if constexpr (is_mat_v<T>) {
+        return v.map(
+            [](auto& e, size_t i, size_t j) { return sigmoid_impl(e); });
+    } else {
+        return sigmoid_impl(v);
+    }
+}
+
+template <typename T>
+T sin(const T& v) {
+    if constexpr (is_vec_v<T>) {
+        return v.map([](auto& e, size_t i) { return std::sin(e); });
+    } else if constexpr (is_mat_v<T>) {
+        return v.map([](auto& e, size_t i, size_t j) { return std::sin(e); });
+    } else {
+        return std::sin(v);
+    }
+}
+
+template <typename T>
+T cos(const T& v) {
+    if constexpr (is_vec_v<T>) {
+        return v.map([](auto& e, size_t i) { return std::cos(e); });
+    } else if constexpr (is_mat_v<T>) {
+        return v.map([](auto& e, size_t i, size_t j) { return std::cos(e); });
+    } else {
+        return std::cos(v);
+    }
+}
+
 template <typename TR, typename TP, typename TB>
 static TR compute_grad_mult(const TP& parent_grad, const TB& brother_value) {
     TR result;
@@ -142,7 +179,7 @@ class _Value {
 
    public:
     explicit _Value(
-        T value, void (*backward_f)(_Value*) = [](_Value<T>*) {},
+        T value, void (*backward_f)(_Value<T>*) = [](_Value<T>*) {},
         std::ostream& (*to_string)(std::ostream&, const _Value<T>*) =
             &_Value<T>::default_to_string,
         std::string op_name = "Value", std::vector<void*> const& children = {})
@@ -168,8 +205,8 @@ class _Value {
         m_has_grad = true;
         m_backward_f(this);
     }
-    T value() const { return m_value; }
-    T grad() const {
+    T& value() { return m_value; }
+    T& grad() {
         if (!m_has_grad) {
             std::cerr << "grad() called on a node without computed gradient"
                       << std::endl;
@@ -251,6 +288,8 @@ class _Value {
         _Value<TR>* result =                                                   \
             new _Value<TR>(lhs.m_value op rhs.m_value, backward_f, to_string,  \
                            #op, {&lhs, &rhs});                                 \
+        lhs.m_parent = result;                                                 \
+        rhs.m_parent = result;                                                 \
         return *result;                                                        \
     }                                                                          \
     AD_BINARY_PERFECT_FORWARD(op, operator op)
@@ -288,6 +327,7 @@ class _Value {
         };                                                                 \
         _Value<TR>* result =                                               \
             new _Value<TR>(value, backward_f, to_string, #op, {&obj});     \
+        obj.m_parent = result;                                             \
         return *result;                                                    \
     }                                                                      \
     template <typename TR = decltype(op std::declval<T>())>                \
@@ -302,7 +342,20 @@ class _Value {
     template <typename T1>
     friend _Value<T1>& relu(_Value<T1>& obj);
     template <typename T1>
+    friend _Value<T1>& sigmoid(_Value<T1>& obj);
+    template <typename T1>
     friend _Value<float>& sum(_Value<T1>& obj);
+    template <typename T1>
+    friend _Value<T1>& sin(_Value<T1>& obj);
+    template <typename T1>
+    friend _Value<T1>& cos(_Value<T1>& obj);
+    template <typename T1>
+    friend _Value<T1>& cos(_Value<T1>& obj);
+    template <unsigned int N>
+    friend _Value<common::Vec<float, N>>& expand(_Value<float>& obj);
+    template <unsigned int N, unsigned int S>
+    friend _Value<common::Vec<float, S * N>>& expand(
+        _Value<common::Vec<float, S>>& obj);
 };
 
 using Value = _Value<float>;
@@ -349,6 +402,8 @@ _Value<T1>& pow(_Value<T1>& base, _Value<T2>& exponent) {
     _Value<T1>* result =
         new _Value<T1>(ad::detail::pow(base.m_value, exponent.m_value),
                        backward_f, to_string, "**", {&base, &exponent});
+    base.m_parent = result;
+    exponent.m_parent = result;
     return *result;
 }
 AD_POW_TEMPLATE
@@ -395,11 +450,91 @@ _Value<T>& relu(_Value<T>& obj) {
     _Value<T>* result =
         new _Value<T>(ad::detail::relu_helper(obj.m_value, obj.m_value),
                       backward_f, to_string, "relu", {&obj});
+    obj.m_parent = result;
     return *result;
 }
 template <typename T>
 _Value<T>& relu(_Value<T>&& v) {
     return relu(v);
+}
+
+template <typename T>
+_Value<T>& sigmoid(_Value<T>& obj) {
+    static auto backward_f = [](_Value<T>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        if (obj->m_requires_grad) {
+            obj->m_grad = ad::detail::ewise_mult(
+                v->m_grad, ad::detail::ewise_mult(v->m_value, -v->m_value + 1));
+            obj->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _Value<T>* v) -> std::ostream& {
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        o << "sigmoid(" << *obj << ")";
+        return o;
+    };
+    _Value<T>* result = new _Value<T>(ad::detail::sigmoid(obj.m_value),
+                                      backward_f, to_string, "sigmoid", {&obj});
+    obj.m_parent = result;
+    return *result;
+}
+template <typename T>
+_Value<T>& sigmoid(_Value<T>&& v) {
+    return sigmoid(v);
+}
+
+template <typename T>
+_Value<T>& sin(_Value<T>& obj) {
+    static auto backward_f = [](_Value<T>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        if (obj->m_requires_grad) {
+            obj->m_grad = v->m_grad * ad::detail::cos(obj->m_value);
+            obj->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _Value<T>* v) -> std::ostream& {
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        o << "sin(" << *obj << ")";
+        return o;
+    };
+    _Value<T>* result = new _Value<T>(ad::detail::sin(obj.m_value), backward_f,
+                                      to_string, "sin", {&obj});
+    obj.m_parent = result;
+    return *result;
+}
+template <typename T>
+_Value<T>& sin(_Value<T>&& v) {
+    return sin(v);
+}
+
+template <typename T>
+_Value<T>& cos(_Value<T>& obj) {
+    static auto backward_f = [](_Value<T>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        if (obj->m_requires_grad) {
+            obj->m_grad = v->m_grad * ad::detail::sin(obj->m_value) * -1.0f;
+            obj->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _Value<T>* v) -> std::ostream& {
+        _Value<T>* obj = static_cast<_Value<T>*>(v->m_children[0]);
+        o << "cos(" << *obj << ")";
+        return o;
+    };
+    _Value<T>* result = new _Value<T>(ad::detail::cos(obj.m_value), backward_f,
+                                      to_string, "cos", {&obj});
+    obj.m_parent = result;
+    return *result;
+}
+template <typename T>
+_Value<T>& cos(_Value<T>&& v) {
+    return cos(v);
 }
 
 /// Tensor-like structures ///
@@ -430,11 +565,74 @@ Value& sum(_Value<T>& obj) {
     };
     Value* result = new Value(detail::sum(obj.m_value), backward_f, to_string,
                               "sum", {&obj});
+    obj.m_parent = result;
     return *result;
 }
 template <typename T>
 Value& sum(_Value<T>&& v) {
     return sum(v);
+}
+
+/// Tensor expand operations ///
+
+template <unsigned int N>
+Vector<N>& expand(Value& obj) {
+    static auto backward_f = [](Vector<N>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        Value* obj = static_cast<Value*>(v->m_children[0]);
+        if (obj->m_requires_grad) {
+            obj->m_grad = detail::sum(v->m_grad);
+            obj->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const Vector<N>* v) -> std::ostream& {
+        Value* obj = static_cast<Value*>(v->m_children[0]);
+        for (unsigned int i = 0; i < N; ++i) o << obj->m_value;
+        return o;
+    };
+    Vector<N>* result =
+        new Vector<N>(obj.m_value, backward_f, to_string,
+                      "expand(" + std::to_string(N) + ")", {&obj});
+    obj.m_parent = result;
+    return *result;
+}
+template <unsigned int N>
+Vector<N>& expand(Value&& obj) {
+    return expand<N>(obj);
+}
+
+template <unsigned int N, unsigned int S>
+Vector<S * N>& expand(Vector<S>& obj) {
+    static auto backward_f = [](Vector<S * N>* v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        Vector<S>* obj = static_cast<Vector<S>*>(v->m_children[0]);
+        if (obj->m_requires_grad) {
+            obj->m_grad = 0;
+            for (unsigned int i = 0; i < S; ++i)
+                for (unsigned int j = i; j < S * N; j += N)
+                    obj->m_grad[i] += v->m_grad[j];
+            obj->backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const Vector<S * N>* v) -> std::ostream& {
+        Vector<S>* obj = static_cast<Vector<S>*>(v->m_children[0]);
+        for (unsigned int i = 0; i < N; ++i) o << obj->m_value;
+        return o;
+    };
+    Vector<S* N>* result =
+        new Vector<S * N>(common::Vec<float, S * N>(), backward_f, to_string,
+                          "expand(" + std::to_string(N) + ")", {&obj});
+    obj.m_parent = result;
+    for (unsigned int i = 0; i < N; ++i)
+        for (unsigned int j = 0; j < S; ++j)
+            result->m_value[i * S + j] = obj.m_value[j];
+    return *result;
+}
+template <unsigned int N, unsigned int S>
+Vector<S * N>& expand(Vector<S>&& obj) {
+    return expand<N, S>(obj);
 }
 
 };  // namespace ad

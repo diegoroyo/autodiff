@@ -25,3 +25,6 @@ target_link_libraries(matrixvector PRIVATE libcpp-common)
 
 add_executable(andgate "examples/andgate.cpp")
 target_link_libraries(andgate PRIVATE libcpp-common)
+
+add_executable(nerf "examples/nerf.cpp")
+target_link_libraries(nerf PRIVATE libcpp-common)
