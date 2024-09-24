@@ -28,3 +28,6 @@ target_link_libraries(andgate PRIVATE libcpp-common)
 
 add_executable(nerf "examples/nerf.cpp")
 target_link_libraries(nerf PRIVATE libcpp-common)
+
+add_executable(sis "examples/sis.cpp")
+target_link_libraries(sis PRIVATE libcpp-common)

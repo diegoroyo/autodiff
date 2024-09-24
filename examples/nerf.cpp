@@ -49,13 +49,13 @@ class NeRF {
     ad::Vector<128> b1, b2, b3;
     ad::Vector<3> b4;
 
-    ad::Vector<3>& forward(ad::Vector<2>& xy) {
-        ad::Vector<32>& input = ad::nn::positional_encoding<8>(xy);
+    ad::Vector<3> forward(ad::Vector<2>& xy) {
+        ad::Vector<32> input = ad::nn::positional_encoding<8>(xy);
 
-        ad::Vector<128>& l1 = ad::relu(w1 * input + b1);
-        ad::Vector<128>& l2 = ad::relu(w2 * l1 + b2);
-        ad::Vector<128>& l3 = ad::relu(w3 * l2 + b3);
-        ad::Vector<3>& output = ad::sigmoid(w4 * l3 + b4);
+        ad::Vector<128> l1 = ad::relu(w1 * input + b1);
+        ad::Vector<128> l2 = ad::relu(w2 * l1 + b2);
+        ad::Vector<128> l3 = ad::relu(w3 * l2 + b3);
+        ad::Vector<3> output = ad::sigmoid(w4 * l3 + b4);
 
         return output;
     }
@@ -112,8 +112,8 @@ int main() {
         ad::Vector<2> xy({(float)px / width, (float)py / height});
         common::Vec3f y_i = y(px, py);
 
-        auto& y_est = nerf.forward(xy);
-        auto& loss = ad::pow(y_est - y_i, 2);
+        auto y_est = nerf.forward(xy);
+        auto loss = ad::pow(y_est - y_i, 2);
         loss.backward();
         nerf.update(lr);
 

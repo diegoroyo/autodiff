@@ -1,6 +1,9 @@
 #pragma once
 
-#include "autodiff/autodiff.h"
+#include <type_traits>
+
+#include "autodiff/types.h"
+#include "autodiff/value.h"
 
 namespace ad {
 
@@ -8,7 +11,7 @@ namespace nn {
 
 template <unsigned int N, typename T,
           typename = std::enable_if_t<!ad::detail::is_value_v<T>>>
-auto& positional_encoding(_Value<T>& v) {
+auto positional_encoding(_ValueWrapper<T>& v) {
     if constexpr (N == 0) {
         return v;
     }

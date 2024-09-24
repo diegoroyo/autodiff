@@ -1,9 +1,11 @@
+#include <iostream>
+
 #include "autodiff/autodiff.h"
 
 int main() {
-    ad::Value x(-3);
+    ad::Value x(-3.14);
 
-    auto y = ad::relu(-x * 3 + 2);
+    ad::Value y = ad::relu(-x * 3 + 2);
     y.backward();
 
     std::cout << y << std::endl;

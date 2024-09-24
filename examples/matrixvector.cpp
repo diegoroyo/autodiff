@@ -7,7 +7,7 @@ int main() {
     ad::Matrix<3, 3> mat1(common::Mat3f::identity());
     ad::Vector<3> v1(raw_1);
     ad::Vector<3> v2({2, 4, 6});
-    auto y = ad::pow(v1, 2);
+    auto y = ad::pow(mat1 * v1 + v2, 2);
     auto s = ad::sum(y);
     s.backward();
 

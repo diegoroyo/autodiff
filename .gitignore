@@ -1,3 +1,5 @@
 .vscode
 build
 examples/memories
+examples/sis.cpp
+examples/gif
