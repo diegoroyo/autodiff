@@ -14,13 +14,15 @@ The full example is available at [`examples/nerf.cpp`](https://github.com/diegor
 ### Model
 
 ```c++
-ad::Vector<3>& forward(ad::Vector<2>& xy) {
-    ad::Vector<32>& input = ad::nn::positional_encoding<8>(xy);
+#include "autodiff/autodiff.h"
 
-    ad::Vector<128>& l1 = ad::relu(w1 * input + b1);
-    ad::Vector<128>& l2 = ad::relu(w2 * l1 + b2);
-    ad::Vector<128>& l3 = ad::relu(w3 * l2 + b3);
-    ad::Vector<3>& output = ad::sigmoid(w4 * l3 + b4);
+ad::Vector<3> forward(ad::Vector<2>& xy) {
+    ad::Vector<32> input = ad::nn::positional_encoding<8>(xy);
+
+    ad::Vector<128> l1 = ad::relu(w1 * input + b1);
+    ad::Vector<128> l2 = ad::relu(w2 * l1 + b2);
+    ad::Vector<128> l3 = ad::relu(w3 * l2 + b3);
+    ad::Vector<3> output = ad::sigmoid(w4 * l3 + b4);
 
     return output;
 }
@@ -31,6 +33,8 @@ The training chooses random pixels from an image and uses that as a loss so the 
 ### Training
 
 ```c++
+#include "autodiff/autodiff.h"
+
 common::Bitmap3f image = common::load_bitmap<common::Color3f>(
     "sunflower.ppm");
 auto [width, height] = y.size();
@@ -42,22 +46,37 @@ for (size_t step = 0; step < steps; ++step) {
     ad::Vector<2> xy({(float)px / width, (float)py / height});
     common::Vec3f y_i = y(px, py);
 
-    auto& y_est = nerf.forward(xy);
-    auto& loss = ad::pow(y_est - y_i, 2);
+    auto y_est = nerf.forward(xy);
+    auto loss = ad::pow(y_est - y_i, 2);
     loss.backward();
     nerf.update(lr);
 }
 ```
 </details>
 
-## Implemented functions
+## Usage
 
-### `autodiff/autodiff.h`
+You only need to include `autodiff.h`:
+
+```c++
+#include "autodiff/autodiff.h"
+```
+
+The available classes and functions are listed below.
+
+### `autodiff/value.h`
 
 #### Base types
-* `ad::Value` for scalar values
-* `ad::Vector<N>` for vectors of size `N`
-* `ad::Matrix<N, M>` for matrices of `N` rows and `M` columns
+* `ad::Value` for scalar values (uses `float`)
+* `ad::Vector<N>` for vectors of size `N` (uses `common::Vec<float, N>`)
+* `ad::Matrix<N, M>` for matrices of `N` rows and `M` columns (uses `common::Mat<float, N, M>`)
+
+Each of these forms a node that computes `y = f(x)`. Each node has the following methods:
+* `value()`: Returns `f(x)`
+* `backward()`: Computes the derivatives of all children nodes in the graph (see `grad()`).
+* `grad()`: Returns `dy/dx`, where `y` is the variable you called `backward()` on, and `x` is the current node.
+* `requires_grad()`: Whether derivatives will be computed on its when `backward()` is called.
+* `update(float lr)`: Short for `value() -= grad() * lr`
 
 #### Basic operators
 * `+`, `-`, `/`

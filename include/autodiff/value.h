@@ -172,10 +172,7 @@ class _ValueWrapper {
     // of the methods of this list.
     // the is_same_template are there to prevent _Value<_Value<T>> recursiveness
 #define AD_BINARY_OP(op, lhs_grad, rhs_grad)                                  \
-    template <typename B,                                                     \
-              typename = std::enable_if_t<!detail::is_value_v<T> &&           \
-                                          !detail::is_value_v<B>>,            \
-              typename R = decltype(std::declval<T>() op std::declval<B>())>  \
+    AD_TEMPLATE_NON_CLS(op)                                                   \
     friend _ValueWrapper<R> operator op(_ValueWrapper<T>& lhs,                \
                                         _ValueWrapper<B>& rhs) {              \
         static auto backward_f = [](_ValueData<R>& v) {                       \
