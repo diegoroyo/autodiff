@@ -88,8 +88,8 @@ class _ValueData : public _AbstractValue {
     T& value() { return m_value; }
     T& grad() {
         if (!m_has_grad) {
-            std::cerr << "grad() called on a node without computed gradient"
-                      << std::endl;
+            throw ad::ADException(
+                "grad() called on a node without computed gradient");
         }
         return m_grad;
     }

@@ -20,7 +20,7 @@ _ValueWrapper<B> pow(_ValueWrapper<B>& base, _ValueWrapper<E>& exponent) {
             base.backward();
         }
         if (exponent.m_requires_grad) {
-            throw detail::ADException(
+            throw ADException(
                 "NYI. gradient cannot be computed for the base in ad::pow");
             // NOTE this would just work if we implemented element-wise log for
             // vector/matrix types. But it's too much work for sth that is not
@@ -256,7 +256,6 @@ Vector<S * N> expand(Vector<S>& obj) {
             o << v.template get_child<typename Vector<S>::type>(0).m_value;
         return o;
     };
-    // FIXME if this does not work switch to common::Vec<float, S * N>()
     Vector<S * N> result({}, backward_f, to_string,
                          "expand(" + std::to_string(N) + ")", {AD_CHILD(obj)});
     obj.set_parent(result);

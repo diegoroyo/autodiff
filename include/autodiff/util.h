@@ -12,7 +12,6 @@
     }
 
 namespace ad {
-namespace detail {
 
 class ADException : public std::exception {
    private:
@@ -25,6 +24,8 @@ class ADException : public std::exception {
         return m_message.c_str();
     }
 };
+
+namespace detail {
 
 template <typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
 T sum(const T& v) {

@@ -6,7 +6,6 @@
 #include "autodiff/value.h"
 
 namespace ad {
-
 namespace nn {
 
 template <unsigned int N, typename T,
@@ -34,5 +33,4 @@ auto positional_encoding(_ValueWrapper<T>& v) {
 }
 
 };  // namespace nn
-
 };  // namespace ad
