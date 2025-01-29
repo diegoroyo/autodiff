@@ -1,5 +1,7 @@
 #pragma once
 
+#include <math.h>
+
 #include <iostream>
 
 #include "autodiff/types.h"

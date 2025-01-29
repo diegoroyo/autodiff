@@ -18,8 +18,8 @@ auto positional_encoding(_ValueWrapper<T>& v) {
     constexpr unsigned int IS = ad::detail::is_vec_v<T> ? T::size : 1;
 
     constexpr unsigned int OS = (2 * N) * IS;
-    common::Vec<float, OS> scales = 0;
-    common::Vec<float, OS> offsets = 0;
+    common::Tensor<float, OS> scales = 0;
+    common::Tensor<float, OS> offsets = 0;
     for (unsigned int i = 0; i < N; ++i) {
         for (unsigned int j = 2 * i * IS; j < 2 * i * IS + IS; ++j) {
             scales[j] = std::pow(2, i);
@@ -31,6 +31,11 @@ auto positional_encoding(_ValueWrapper<T>& v) {
 
     return ad::sin(ad::expand<2 * N>(v) * scales + offsets);
 }
+
+// template <unsigned int C_OUT, unsigned int H, unsigned int W, unsigned int
+// C_IN> auto conv2d(const Tensor<H, W, C_IN>& input,
+//             const Tensor<H, W, C_IN, C_OUT>& kernel,
+//             const Tensor<H, W, C_OUT>& bias) {}
 
 };  // namespace nn
 };  // namespace ad

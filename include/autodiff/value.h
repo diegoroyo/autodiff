@@ -14,11 +14,14 @@ class _ValueWrapper;
 
 using Value = _ValueWrapper<float>;
 
-template <unsigned int N>
-using Vector = _ValueWrapper<common::Vec<float, N>>;
+template <size_t N>
+using Vector = _ValueWrapper<common::Tensor<float, N>>;
 
-template <unsigned int N, unsigned int M = N>
-using Matrix = _ValueWrapper<common::Mat<float, N, M>>;
+template <size_t N, size_t M = N>
+using Matrix = _ValueWrapper<common::Tensor<float, N, M>>;
+
+template <size_t... Shape>
+using Tensor = _ValueWrapper<common::Tensor<float, Shape...>>;
 
 #define AD_CLASS_FUNCTIONS                                   \
     template <typename B, typename E, typename>              \
@@ -41,9 +44,10 @@ using Matrix = _ValueWrapper<common::Mat<float, N, M>>;
 
 class _AbstractValue {};
 
-template <typename T, typename = std::enable_if_t<std::is_scalar_v<T> ||
-                                                  detail::is_vec_v<T> ||
-                                                  detail::is_mat_v<T>>>
+template <typename T,
+          typename =
+              std::enable_if_t<std::is_scalar_v<T> || detail::is_vec_v<T> ||
+                               detail::is_mat_v<T> || detail::is_tensor_v<T>>>
 class _ValueData : public _AbstractValue {
    public:
     template <typename A, typename>
