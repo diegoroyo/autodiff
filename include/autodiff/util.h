@@ -33,7 +33,8 @@ template <typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
 T sum(const T& v) {
     return v;
 }
-template <typename T, typename = std::enable_if_t<is_vec_v<T> || is_mat_v<T>>>
+template <typename T, typename = std::enable_if_t<is_vec_v<T> || is_mat_v<T> ||
+                                                  is_tensor_v<T>>>
 typename T::type sum(const T& v) {
     return v.sum();
 }

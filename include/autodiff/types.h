@@ -2,15 +2,14 @@
 
 #include <type_traits>
 
+#include "libcpp-common/geometry.h"
 #include "libcpp-common/tensor.h"
 
 namespace ad {
 namespace detail {
 
-template <typename T, typename = void>
-struct is_value : std::false_type {};
 template <typename T>
-struct is_value<T, std::void_t<typename T::_ad_value_type>> : std::true_type {};
+struct is_value : std::is_same<float, T> {};
 template <typename T>
 inline constexpr bool is_value_v = is_value<T>::value;
 
