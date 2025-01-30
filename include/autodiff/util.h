@@ -33,8 +33,7 @@ template <typename T, typename = std::enable_if_t<std::is_scalar_v<T>>>
 T sum(const T& v) {
     return v;
 }
-template <typename T, typename = std::enable_if_t<is_vec_v<T> || is_mat_v<T> ||
-                                                  is_tensor_v<T>>>
+template <typename T, typename = std::enable_if_t<is_tensor_v<T>>>
 typename T::type sum(const T& v) {
     return v.sum();
 }
@@ -51,8 +50,9 @@ auto sum_if_scalar(const R& v) {
 template <typename B, typename E,
           typename = std::enable_if_t<std::is_scalar_v<E>>>
 B pow(const B& base, const E& exponent) {
-    if constexpr (is_vec_v<B> || is_mat_v<B>) {
-        return base.pow(exponent);
+    if constexpr (is_tensor_v<B>) {
+        return base.map(
+            [exponent](auto& e, size_t i) { return std::pow(e, exponent); });
     } else {
         return std::pow(base, exponent);
     }
@@ -60,7 +60,7 @@ B pow(const B& base, const E& exponent) {
 
 template <typename T>
 T ewise_mult(const T& lhs, const T& rhs) {
-    if constexpr (is_vec_v<T> || is_mat_v<T>) {
+    if constexpr (is_tensor_v<T>) {
         return lhs.ewise_mult(rhs);
     } else {
         return lhs * rhs;
@@ -69,13 +69,9 @@ T ewise_mult(const T& lhs, const T& rhs) {
 
 template <typename T>
 T relu_helper(const T& cond, const T& v) {
-    if constexpr (is_vec_v<T>) {
+    if constexpr (is_tensor_v<T>) {
         return v.map(
-            [&cond](auto& e, size_t i) { return cond[i] > 0 ? e : 0; });
-    } else if constexpr (is_mat_v<T>) {
-        return v.map([&cond](auto& e, size_t i, size_t j) {
-            return cond(i, j) > 0 ? e : 0;
-        });
+            [&cond](auto& e, size_t i) { return cond.at(i) > 0 ? e : 0; });
     } else {
         return cond > 0 ? v : 0;
     }
@@ -84,11 +80,8 @@ T relu_helper(const T& cond, const T& v) {
 template <typename T>
 T sigmoid(const T& v) {
     static auto sigmoid_impl = [](float x) { return 1 / (1 + std::exp(-x)); };
-    if constexpr (is_vec_v<T>) {
+    if constexpr (is_tensor_v<T>) {
         return v.map([](auto& e, size_t i) { return sigmoid_impl(e); });
-    } else if constexpr (is_mat_v<T>) {
-        return v.map(
-            [](auto& e, size_t i, size_t j) { return sigmoid_impl(e); });
     } else {
         return sigmoid_impl(v);
     }
@@ -96,10 +89,8 @@ T sigmoid(const T& v) {
 
 template <typename T>
 T sin(const T& v) {
-    if constexpr (is_vec_v<T>) {
+    if constexpr (is_tensor_v<T>) {
         return v.map([](auto& e, size_t i) { return std::sin(e); });
-    } else if constexpr (is_mat_v<T>) {
-        return v.map([](auto& e, size_t i, size_t j) { return std::sin(e); });
     } else {
         return std::sin(v);
     }
@@ -107,10 +98,8 @@ T sin(const T& v) {
 
 template <typename T>
 T cos(const T& v) {
-    if constexpr (is_vec_v<T>) {
+    if constexpr (is_tensor_v<T>) {
         return v.map([](auto& e, size_t i) { return std::cos(e); });
-    } else if constexpr (is_mat_v<T>) {
-        return v.map([](auto& e, size_t i, size_t j) { return std::cos(e); });
     } else {
         return std::cos(v);
     }
@@ -124,9 +113,9 @@ static R compute_grad_mult(const P& parent_grad, const B& brother_value) {
     if constexpr (is_vec_v<R> && is_mat_v<B>) {
         result = brother_value.transpose() * parent_grad;
     } else if constexpr (is_mat_v<R> && is_vec_v<B>) {
-        for (unsigned int i = 0; i < R::rows; ++i)
-            for (unsigned int j = 0; j < R::cols; ++j)
-                result(i, j) = parent_grad[i] * brother_value[j];
+        for (size_t i = 0; i < R::shape[0]; ++i)
+            for (size_t j = 0; j < R::shape[1]; ++j)
+                result(i, j) = parent_grad(i) * brother_value(j);
     } else {
         result = detail::sum_if_scalar<R>(brother_value * parent_grad);
     }

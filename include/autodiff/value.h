@@ -115,6 +115,7 @@ class _ValueData : public _AbstractValue {
 template <typename T>
 class _ValueWrapper {
    public:
+    using _ad_value_type = T;
     using type = T;
 
    private:
