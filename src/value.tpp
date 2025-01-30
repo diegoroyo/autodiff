@@ -207,7 +207,7 @@ Value sum(Value&& v) {
 
 /// Tensor expand operations ///
 
-template <unsigned int N>
+template <size_t N>
 Vector<N> expand(Value& obj) {
     static auto backward_f = [](_ValueData<typename Vector<N>::type>& v) {
         AD_ENSURE_REQUIRES_GRAD(v);
@@ -221,7 +221,7 @@ Vector<N> expand(Value& obj) {
     static auto to_string =
         [](std::ostream& o,
            const _ValueData<typename Vector<N>::type>& v) -> std::ostream& {
-        for (unsigned int i = 0; i < N; ++i)
+        for (size_t i = 0; i < N; ++i)
             o << v.template get_child<typename Value::type>(0).m_value;
         return o;
     };
@@ -230,12 +230,12 @@ Vector<N> expand(Value& obj) {
     obj.set_parent(result);
     return result;
 }
-template <unsigned int N>
+template <size_t N>
 Vector<N> expand(Value&& obj) {
     return expand<N>(obj);
 }
 
-template <unsigned int N, unsigned int S>
+template <size_t N, size_t S>
 Vector<S * N> expand(Vector<S>& obj) {
     static auto backward_f = [](_ValueData<typename Vector<S * N>::type>& v) {
         AD_ENSURE_REQUIRES_GRAD(v);
@@ -243,28 +243,28 @@ Vector<S * N> expand(Vector<S>& obj) {
             v.template get_child<typename Vector<S>::type>(0);
         if (child.m_requires_grad) {
             child.m_grad = 0;
-            for (unsigned int i = 0; i < S; ++i)
-                for (unsigned int j = i; j < S * N; j += N)
-                    child.m_grad[i] += v.m_grad[j];
+            for (size_t i = 0; i < S; ++i)
+                for (size_t j = i; j < S * N; j += N)
+                    child.m_grad(i) += v.m_grad(j);
             child.backward();
         }
     };
     static auto to_string =
         [](std::ostream& o,
            const _ValueData<typename Vector<S * N>::type>& v) -> std::ostream& {
-        for (unsigned int i = 0; i < N; ++i)
+        for (size_t i = 0; i < N; ++i)
             o << v.template get_child<typename Vector<S>::type>(0).m_value;
         return o;
     };
     Vector<S * N> result({}, backward_f, to_string,
                          "expand(" + std::to_string(N) + ")", {AD_CHILD(obj)});
     obj.set_parent(result);
-    for (unsigned int i = 0; i < N; ++i)
-        for (unsigned int j = 0; j < S; ++j)
-            result.value()[i * S + j] = obj.value()[j];
+    for (size_t i = 0; i < N; ++i)
+        for (size_t j = 0; j < S; ++j)
+            result.value()(i * S + j) = obj.value()(j);
     return result;
 }
-template <unsigned int N, unsigned int S>
+template <size_t N, size_t S>
 Vector<S * N> expand(Vector<S>&& obj) {
     return expand<N, S>(obj);
 }

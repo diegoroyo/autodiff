@@ -37,17 +37,15 @@ using Tensor = _ValueWrapper<common::Tensor<float, Shape...>>;
     friend _ValueWrapper<A> sin(_ValueWrapper<A>& obj);      \
     template <typename A>                                    \
     friend _ValueWrapper<A> cos(_ValueWrapper<A>& obj);      \
-    template <unsigned int N>                                \
+    template <size_t N>                                      \
     friend Vector<N> expand(Value& obj);                     \
-    template <unsigned int N, unsigned int S>                \
+    template <size_t N, size_t S>                            \
     friend Vector<S * N> expand(Vector<S>& obj);
 
 class _AbstractValue {};
 
-template <typename T,
-          typename =
-              std::enable_if_t<std::is_scalar_v<T> || detail::is_vec_v<T> ||
-                               detail::is_mat_v<T> || detail::is_tensor_v<T>>>
+template <typename T, typename = std::enable_if_t<std::is_scalar_v<T> ||
+                                                  detail::is_tensor_v<T>>>
 class _ValueData : public _AbstractValue {
    public:
     template <typename A, typename>

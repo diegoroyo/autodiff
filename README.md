@@ -1,6 +1,6 @@
 # `autodiff`
 
-My implementation of an autodiff library that supports scalar, vector and matrix data types. Everything was done from scratch. The `examples` folder shows how to use it for some cases, including the implementation of a NeRF model that is able to learn an image. This project was made just for fun.
+My implementation of an autodiff library that supports scalar and tensor-like (vector, matrix, and higher dimension) data types. Everything was done from scratch. The `examples` folder shows how to use it for some cases, including the implementation of a NeRF model that is able to learn an image. This project was made just for fun.
 
 | Reference image | Learning process | Final learned image
 | --- | --- | --- |
@@ -44,7 +44,7 @@ for (size_t step = 0; step < steps; ++step) {
     unsigned int py = rand() % height;
 
     ad::Vector<2> xy({(float)px / width, (float)py / height});
-    common::Vec3f y_i = y(px, py);
+    common::Tensor<float, 3> y_i = y(px, py);
 
     auto y_est = nerf.forward(xy);
     auto loss = ad::pow(y_est - y_i, 2);
@@ -68,8 +68,9 @@ The available classes and functions are listed below.
 
 #### Base types
 * `ad::Value` for scalar values (uses `float`)
-* `ad::Vector<N>` for vectors of size `N` (uses `common::Vec<float, N>`)
-* `ad::Matrix<N, M>` for matrices of `N` rows and `M` columns (uses `common::Mat<float, N, M>`)
+* `ad::Vector<N>` for vectors of size `N` (uses `common::Tensor<float, N>`)
+* `ad::Matrix<N, M>` for matrices of `N` rows and `M` columns (uses `common::Tensor<float, N, M>`)
+* `ad::Tensor<Shape...>` for general tensor data (uses `common::Tensor<float, Shape...>`)
 
 Each of these forms a node that computes `y = f(x)`. Each node has the following methods:
 * `value()`: Returns `f(x)`

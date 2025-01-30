@@ -10,16 +10,11 @@ class NeRF {
    private:
     std::default_random_engine m_generator;
     std::normal_distribution<float> m_normal_distribution;
-    template <unsigned int N, unsigned int M>
-    void fill_matrix(ad::Matrix<N, M>& m) {
-        for (unsigned int i = 0; i < N; ++i)
-            for (unsigned int j = 0; j < M; ++j)
-                m.value()(i, j) = m_normal_distribution(m_generator);
-    }
-    template <unsigned int N>
-    void fill_vector(ad::Vector<N>& m) {
-        for (unsigned int i = 0; i < N; ++i)
-            m.value()[i] = m_normal_distribution(m_generator);
+    template <size_t... Shape>
+    void fill_tensor(ad::Tensor<Shape...>& t) {
+        t.value() = t.value().map([this](auto& e, size_t i) {
+            return m_normal_distribution(m_generator);
+        });
     }
 
    public:
@@ -34,14 +29,14 @@ class NeRF {
           b2(0),
           b3(0),
           b4(0) {
-        fill_matrix(w1);
-        fill_matrix(w2);
-        fill_matrix(w3);
-        fill_matrix(w4);
-        fill_vector(b1);
-        fill_vector(b2);
-        fill_vector(b3);
-        fill_vector(b4);
+        fill_tensor(w1);
+        fill_tensor(w2);
+        fill_tensor(w3);
+        fill_tensor(w4);
+        fill_tensor(b1);
+        fill_tensor(b2);
+        fill_tensor(b3);
+        fill_tensor(b4);
     }
     ad::Matrix<128, 32> w1;
     ad::Matrix<128, 128> w2, w3;
@@ -110,7 +105,7 @@ int main() {
         unsigned int py = rand() % height;
 
         ad::Vector<2> xy({(float)px / width, (float)py / height});
-        common::Vec3f y_i = y(px, py);
+        common::Tensor<float, 3> y_i = y(px, py);
 
         auto y_est = nerf.forward(xy);
         auto loss = ad::pow(y_est - y_i, 2);
