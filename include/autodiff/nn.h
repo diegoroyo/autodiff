@@ -33,5 +33,14 @@ auto positional_encoding(_ValueWrapper<T>& v) {
     return ad::sin(ad::expand<2 * N>(v) * scales + offsets);
 }
 
+template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K>
+auto conv_2d(Tensor<C_IN, H, W>& input, Tensor<C_OUT, C_IN, K, K>& kernel,
+             Tensor<C_OUT>& bias);
+
+template <size_t H, size_t W, size_t C_IN>
+auto avg_pool_2d(Tensor<C_IN, H, W>& input, size_t kernel_size);
+
 };  // namespace nn
 };  // namespace ad
+
+#include "nn.tpp"

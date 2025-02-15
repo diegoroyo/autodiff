@@ -23,24 +23,38 @@ using Matrix = _ValueWrapper<common::Tensor<float, N, M>>;
 template <size_t... Shape>
 using Tensor = _ValueWrapper<common::Tensor<float, Shape...>>;
 
-#define AD_CLASS_FUNCTIONS                                   \
-    template <typename B, typename E, typename>              \
-    friend _ValueWrapper<B> pow(_ValueWrapper<B>& base,      \
-                                _ValueWrapper<E>& exponent); \
-    template <typename A>                                    \
-    friend _ValueWrapper<A> relu(_ValueWrapper<A>& obj);     \
-    template <typename A>                                    \
-    friend _ValueWrapper<A> sigmoid(_ValueWrapper<A>& obj);  \
-    template <typename A>                                    \
-    friend Value sum(_ValueWrapper<A>& obj);                 \
-    template <typename A>                                    \
-    friend _ValueWrapper<A> sin(_ValueWrapper<A>& obj);      \
-    template <typename A>                                    \
-    friend _ValueWrapper<A> cos(_ValueWrapper<A>& obj);      \
-    template <size_t N>                                      \
-    friend Vector<N> expand(Value& obj);                     \
-    template <size_t N, size_t S>                            \
-    friend Vector<S * N> expand(Vector<S>& obj);
+namespace nn {
+template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K>
+auto conv_2d(Tensor<C_IN, H, W>& input, Tensor<C_OUT, C_IN, K, K>& kernel,
+             Tensor<C_OUT>& bias);
+template <size_t kernel_size, size_t C_IN, size_t H, size_t W>
+auto avg_pool_2d(Tensor<C_IN, H, W>& input);
+};  // namespace nn
+
+#define AD_CLASS_FUNCTIONS                                             \
+    template <typename B, typename E, typename>                        \
+    friend _ValueWrapper<B> pow(_ValueWrapper<B>& base,                \
+                                _ValueWrapper<E>& exponent);           \
+    template <typename A>                                              \
+    friend _ValueWrapper<A> relu(_ValueWrapper<A>& obj);               \
+    template <typename A>                                              \
+    friend _ValueWrapper<A> sigmoid(_ValueWrapper<A>& obj);            \
+    template <typename A>                                              \
+    friend Value sum(_ValueWrapper<A>& obj);                           \
+    template <typename A>                                              \
+    friend _ValueWrapper<A> sin(_ValueWrapper<A>& obj);                \
+    template <typename A>                                              \
+    friend _ValueWrapper<A> cos(_ValueWrapper<A>& obj);                \
+    template <size_t N>                                                \
+    friend Vector<N> expand(Value& obj);                               \
+    template <size_t N, size_t S>                                      \
+    friend Vector<S * N> expand(Vector<S>& obj);                       \
+    template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K> \
+    friend auto nn::conv_2d(Tensor<C_IN, H, W>& input,                 \
+                            Tensor<C_OUT, C_IN, K, K>& kernel,         \
+                            Tensor<C_OUT>& bias);                      \
+    template <size_t kernel_size, size_t C_IN, size_t H, size_t W>     \
+    friend auto nn::avg_pool_2d(Tensor<C_IN, H, W>& input);
 
 class _AbstractValue {};
 
@@ -151,6 +165,9 @@ class _ValueWrapper {
     T& grad() { return m_ptr->grad(); }
     void update(float lr) { m_ptr->update(lr); }
     bool requires_grad() const { return m_ptr->m_requires_grad; }
+    void set_requires_grad(bool requires_grad) {
+        m_ptr->m_requires_grad = requires_grad;
+    }
 
     inline friend std::ostream& operator<<(std::ostream& o,
                                            const _ValueWrapper& v) {
