@@ -27,6 +27,16 @@ int main() {
     std::cout << image.grad() << std::endl;
     std::cout << kernel.grad() << std::endl;
     std::cout << bias.grad() << std::endl;
+
+    ad::Tensor<1, 7, 7> image2(0);
+
+    auto avgpool2 = ad::nn::avg_pool_2d<2>(image2);
+    std::cout << avgpool2 << std::endl;
+
+    auto l2 = ad::sum(avgpool2) * 2;
+    l2.backward();
+
+    std::cout << image2.grad() << std::endl;
 }
 
 /*

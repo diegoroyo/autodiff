@@ -24,6 +24,8 @@ template <size_t... Shape>
 using Tensor = _ValueWrapper<common::Tensor<float, Shape...>>;
 
 namespace nn {
+template <size_t N>
+Vector<N> softmax(Vector<N>& obj);
 template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K>
 auto conv_2d(Tensor<C_IN, H, W>& input, Tensor<C_OUT, C_IN, K, K>& kernel,
              Tensor<C_OUT>& bias);
@@ -35,6 +37,11 @@ auto avg_pool_2d(Tensor<C_IN, H, W>& input);
     template <typename B, typename E, typename>                        \
     friend _ValueWrapper<B> pow(_ValueWrapper<B>& base,                \
                                 _ValueWrapper<E>& exponent);           \
+    template <typename V, typename B, typename>                        \
+    friend _ValueWrapper<V> log(_ValueWrapper<V>& value,               \
+                                _ValueWrapper<B>& base);               \
+    template <typename A>                                              \
+    friend _ValueWrapper<A> exp(_ValueWrapper<A>& obj);                \
     template <typename A>                                              \
     friend _ValueWrapper<A> relu(_ValueWrapper<A>& obj);               \
     template <typename A>                                              \
@@ -49,6 +56,10 @@ auto avg_pool_2d(Tensor<C_IN, H, W>& input);
     friend Vector<N> expand(Value& obj);                               \
     template <size_t N, size_t S>                                      \
     friend Vector<S * N> expand(Vector<S>& obj);                       \
+    template <size_t... Shape>                                         \
+    friend Vector<(Shape * ...)> flatten(Tensor<Shape...>& obj);       \
+    template <size_t N>                                                \
+    friend Vector<N> nn::softmax(Vector<N>& obj);                      \
     template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K> \
     friend auto nn::conv_2d(Tensor<C_IN, H, W>& input,                 \
                             Tensor<C_OUT, C_IN, K, K>& kernel,         \

@@ -33,6 +33,25 @@ auto positional_encoding(_ValueWrapper<T>& v) {
     return ad::sin(ad::expand<2 * N>(v) * scales + offsets);
 }
 
+template <size_t N>
+ad::Vector<N> softmax(ad::Vector<N>& obj);
+
+template <size_t N>
+auto cross_entropy(ad::Vector<N>& logits, ad::Vector<N>& target) {
+    auto probs = softmax(logits);
+    using T = typename ad::Vector<N>::type::type;
+    constexpr T epsilon = std::numeric_limits<T>::epsilon();
+    return -ad::sum(target * ad::log(probs + epsilon));
+}
+template <size_t N>
+auto cross_entropy(ad::Vector<N>& logits, ad::Vector<N>&& target) {
+    return cross_entropy(logits, target);
+}
+template <size_t N, typename T = typename ad::Vector<N>::type>
+auto cross_entropy(ad::Vector<N>& logits, T& target) {
+    return cross_entropy(logits, AD_MAKE_TEMP(target, T));
+}
+
 template <size_t H, size_t W, size_t C_IN, size_t C_OUT, size_t K>
 auto conv_2d(Tensor<C_IN, H, W>& input, Tensor<C_OUT, C_IN, K, K>& kernel,
              Tensor<C_OUT>& bias);

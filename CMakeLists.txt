@@ -31,8 +31,14 @@ target_link_libraries(andgate PRIVATE libcpp-common)
 add_executable(nerf "examples/nerf.cpp")
 target_link_libraries(nerf PRIVATE libcpp-common)
 
+add_executable(sis "examples/sis.cpp")
+target_link_libraries(sis PRIVATE libcpp-common)
+
 add_executable(conv2d "examples/conv2d.cpp")
 target_link_libraries(conv2d PRIVATE libcpp-common)
 
-add_executable(sis "examples/sis.cpp")
-target_link_libraries(sis PRIVATE libcpp-common)
+add_executable(crossentropyloss "examples/crossentropyloss.cpp")
+target_link_libraries(crossentropyloss PRIVATE libcpp-common)
+
+add_executable(lenet "examples/lenet.cpp")
+target_link_libraries(lenet PRIVATE libcpp-common)

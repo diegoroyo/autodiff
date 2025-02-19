@@ -2,10 +2,9 @@ namespace ad {
 
 /// Math functions ///
 
-#define AD_POW_TEMPLATE                                             \
-    template <typename B, typename E,                               \
-              typename = std::enable_if_t<!detail::is_value_v<B> && \
-                                          std::is_scalar_v<E>>>
+#define AD_POW_TEMPLATE               \
+    template <typename B, typename E, \
+              typename = std::enable_if_t<std::is_scalar_v<E>>>
 AD_POW_TEMPLATE
 _ValueWrapper<B> pow(_ValueWrapper<B>& base, _ValueWrapper<E>& exponent) {
     static auto backward_f = [](_ValueData<B>& v) {
@@ -22,11 +21,10 @@ _ValueWrapper<B> pow(_ValueWrapper<B>& base, _ValueWrapper<E>& exponent) {
         if (exponent.m_requires_grad) {
             throw ADException(
                 "NYI. gradient cannot be computed for the base in ad::pow");
-            // NOTE this would just work if we implemented element-wise log for
-            // vector/matrix types. But it's too much work for sth that is not
-            // going to be used
-            // d/dx n^x = n^x log(n) exponent->m_grad =
-            // ad::detail::sum(ad::detail::ewise_mult(
+            // NOTE this could work, but needs to be tested
+            // d/dx n^x = n^x log(n)
+            // exponent->m_grad =
+            //   ad::detail::sum(ad::detail::ewise_mult(
             //     v->m_grad, v->m_value * std::log(base->m_value)));
             // exponent.backward();
         }
@@ -73,8 +71,107 @@ AD_POW_TEMPLATE
 _ValueWrapper<B> pow(B lhs, _ValueWrapper<E>&& rhs) {
     return pow(AD_MAKE_TEMP(lhs, B), rhs);
 }
+#undef AD_POW_TEMPLATE
+
+#define AD_LOG_TEMPLATE               \
+    template <typename V, typename B, \
+              typename = std::enable_if_t<std::is_scalar_v<B>>>
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>& value, _ValueWrapper<B>& base) {
+    static auto backward_f = [](_ValueData<V>& v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _ValueData<V>& value = v.template get_child<V>(0);
+        _ValueData<B>& base = v.template get_child<B>(1);
+        if (value.m_requires_grad) {
+            // d/dx log_b(x) = 1/(x * log(b))
+            value.m_grad = v.m_grad / (value.m_value * std::log(base.m_value));
+            value.backward();
+        }
+        if (base.m_requires_grad) {
+            throw ADException(
+                "NYI. gradient cannot be computed for the base in ad::log");
+            base.backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _ValueData<V>& v) -> std::ostream& {
+        _ValueData<V>& value = v.template get_child<V>(0);
+        _ValueData<B>& base = v.template get_child<B>(1);
+        o << "log_[" << base << "] (" << value << ")";
+        return o;
+    };
+    _ValueWrapper<V> result(ad::detail::log(value.value(), base.value()),
+                            backward_f, to_string, "log",
+                            {AD_CHILD(value), AD_CHILD(base)});
+    value.set_parent(result);
+    base.set_parent(result);
+    return result;
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>& lhs, _ValueWrapper<B>&& rhs) {
+    return log(lhs, rhs);
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>&& lhs, _ValueWrapper<B>& rhs) {
+    return log(lhs, rhs);
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>&& lhs, _ValueWrapper<B>&& rhs) {
+    return log(lhs, rhs);
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>& lhs, B rhs) {
+    return log(lhs, AD_MAKE_TEMP(rhs, B));
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(_ValueWrapper<V>&& lhs, B rhs) {
+    return log(lhs, AD_MAKE_TEMP(rhs, B));
+}
+template <typename V>
+_ValueWrapper<V> log(_ValueWrapper<V>& lhs, float rhs = std::exp(1)) {
+    return log(lhs, AD_MAKE_TEMP(rhs, float));
+}
+template <typename V>
+_ValueWrapper<V> log(_ValueWrapper<V>&& lhs, float rhs = std::exp(1)) {
+    return log(lhs, AD_MAKE_TEMP(rhs, float));
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(V lhs, _ValueWrapper<B>& rhs) {
+    return log(AD_MAKE_TEMP(lhs, B), rhs);
+}
+AD_LOG_TEMPLATE
+_ValueWrapper<V> log(V lhs, _ValueWrapper<B>&& rhs) {
+    return log(AD_MAKE_TEMP(lhs, B), rhs);
+}
+#undef AD_LOG_TEMPLATE
 
 /// Element-wise operations ///
+
+template <typename T>
+_ValueWrapper<T> exp(_ValueWrapper<T>& obj) {
+    static auto backward_f = [](_ValueData<T>& v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _ValueData<T>& child = v.template get_child<T>(0);
+        if (child.m_requires_grad) {
+            child.m_grad = ad::detail::ewise_mult(
+                ad::detail::ewise_mult(child.m_value, v.m_value), v.m_grad);
+            child.backward();
+        }
+    };
+    static auto to_string = [](std::ostream& o,
+                               const _ValueData<T>& v) -> std::ostream& {
+        o << "exp(" << v.template get_child<T>(0) << ")";
+        return o;
+    };
+    _ValueWrapper<T> result(ad::detail::exp(obj.value()), backward_f, to_string,
+                            "exp", {AD_CHILD(obj)});
+    obj.set_parent(result);
+    return result;
+}
+template <typename T>
+_ValueWrapper<T> exp(_ValueWrapper<T>&& v) {
+    return exp(v);
+}
 
 template <typename T>
 _ValueWrapper<T> relu(_ValueWrapper<T>& obj) {
@@ -201,7 +298,7 @@ Value sum(_ValueWrapper<T>& obj) {
     return result;
 }
 template <typename T>
-Value sum(Value&& v) {
+Value sum(_ValueWrapper<T>&& v) {
     return sum(v);
 }
 
@@ -267,6 +364,34 @@ Vector<S * N> expand(Vector<S>& obj) {
 template <size_t N, size_t S>
 Vector<S * N> expand(Vector<S>&& obj) {
     return expand<N, S>(obj);
+}
+
+template <size_t... Shape>
+Vector<(Shape * ...)> flatten(Tensor<Shape...>& obj) {
+    constexpr size_t size = (Shape * ...);
+    static auto backward_f = [](_ValueData<typename Vector<size>::type>& v) {
+        AD_ENSURE_REQUIRES_GRAD(v);
+        _ValueData<typename Tensor<Shape...>::type>& child =
+            v.template get_child<typename Tensor<Shape...>::type>(0);
+        if (child.m_requires_grad) {
+            for (size_t i = 0; i < size; ++i) child.m_grad.at(i) = v.m_grad(i);
+            child.backward();
+        }
+    };
+    static auto to_string =
+        [](std::ostream& o,
+           const _ValueData<typename Vector<size>::type>& v) -> std::ostream& {
+        o << v.template get_child<typename Tensor<Shape...>::type>(0).m_value;
+        return o;
+    };
+    Vector<size> result({}, backward_f, to_string, "flatten", {AD_CHILD(obj)});
+    obj.set_parent(result);
+    for (size_t i = 0; i < size; ++i) result.value()(i) = obj.value().at(i);
+    return result;
+}
+template <size_t... Shape>
+Vector<Tensor<Shape...>::type::size> flatten(Tensor<Shape...>&& obj) {
+    return flatten(obj);
 }
 
 };  // namespace ad

@@ -58,6 +58,26 @@ B pow(const B& base, const E& exponent) {
     }
 }
 
+template <typename V, typename B,
+          typename = std::enable_if_t<std::is_scalar_v<B>>>
+V log(const V& value, const B& base) {
+    if constexpr (is_tensor_v<V>) {
+        return value.map(
+            [base](auto& e, size_t i) { return std::log(e) / std::log(base); });
+    } else {
+        return std::log(value) / std::log(base);
+    }
+}
+
+template <typename T>
+T exp(const T& value) {
+    if constexpr (is_tensor_v<T>) {
+        return value.map([](auto& e, size_t i) { return std::exp(e); });
+    } else {
+        return std::exp(value);
+    }
+}
+
 template <typename T>
 T ewise_mult(const T& lhs, const T& rhs) {
     if constexpr (is_tensor_v<T>) {
